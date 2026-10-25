@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java: ['17', '21']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+      # The compiler toolchain targets Java 17; tests use the matrix JVM.
+      - uses: actions/setup-java@v4
+        if: matrix.java == '21'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Select matrix JVM
+        if: matrix.java == '21'
+        run: echo "JAVA_HOME=$JAVA_HOME_21_X64" >> "$GITHUB_ENV"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and test
+        env:
+          TEST_JAVA_VERSION: ${{ matrix.java }}
+        run: |
+          cat > "$RUNNER_TEMP/test-jvm.gradle" <<'EOF'
+          allprojects {
+              tasks.withType(Test).configureEach {
+                  javaLauncher = javaToolchains.launcherFor {
+                      languageVersion = JavaLanguageVersion.of(Integer.parseInt(System.getenv('TEST_JAVA_VERSION')))
+                  }
+              }
+          }
+          EOF
+          ./gradlew --init-script "$RUNNER_TEMP/test-jvm.gradle" check pluginJar
+      - name: Validate distribution
+        run: python3 scripts/validate-distribution.py
+      - name: Install nf-test 0.9.5
+        run: |
+          mkdir -p "$HOME/.nf-test"
+          curl -fsSL https://github.com/askimed/nf-test/releases/download/v0.9.5/nf-test-0.9.5.tar.gz -o "$RUNNER_TEMP/nf-test.tar.gz"
+          echo 'b7679eb90cdc9642bfa89e9634db02ce6e699de53ad35ef0e2f4847634fc1641  '"$RUNNER_TEMP/nf-test.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/nf-test.tar.gz" -C "$HOME/.nf-test"
+          chmod +x "$HOME/.nf-test/nf-test"
+          echo "$HOME/.nf-test" >> "$GITHUB_PATH"
+      - name: Install stable Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: latest-stable
+      - name: Integration tests
+        run: bash scripts/test-integration.sh

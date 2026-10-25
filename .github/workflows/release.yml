@@ -1,0 +1,47 @@
+name: Attach release distribution
+
+# A human publishes a release first. Pushes/tags never publish automatically.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Check release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(sed -n 's/^version=//p' gradle.properties)
+          test "$RELEASE_TAG" = "v$version"
+      - run: ./gradlew check pluginJar
+      - run: python3 scripts/validate-distribution.py
+      - name: Attach JAR and checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(sed -n 's/^version=//p' gradle.properties)
+          cd build/libs
+          sha256sum "nft-parquet-$version.jar" > "nft-parquet-$version.jar.sha256"
+          assets=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          if grep -Fxq "nft-parquet-$version.jar" <<< "$assets" && grep -Fxq "nft-parquet-$version.jar.sha256" <<< "$assets"; then
+            echo 'JAR and checksum were already attached when publishing; leaving them unchanged.'
+          elif [[ -n "$assets" ]]; then
+            echo 'Release has existing assets but is missing the JAR or checksum; refusing to overwrite a partial distribution.' >&2
+            exit 1
+          else
+            gh release upload "$RELEASE_TAG" "nft-parquet-$version.jar" "nft-parquet-$version.jar.sha256" --repo "$GITHUB_REPOSITORY"
+          fi

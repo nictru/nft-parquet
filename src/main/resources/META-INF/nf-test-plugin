@@ -1,4 +1,5 @@
 moduleName=nft-parquet
-moduleVersion=1.0.0
-moduleAuthors=Jorge Aguilera
+moduleVersion=${version}
+moduleAuthors=Jorge Aguilera, Nico Trummer
+extensionMethods=com.incsteps.nftest.parquet.Methods
 extensionClasses=com.incsteps.nftest.parquet.PathExtension

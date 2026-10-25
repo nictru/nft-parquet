@@ -1,0 +1,17 @@
+[
+  {
+    "id": "nictru-nft-parquet",
+    "latest": "0.1.0",
+    "url": "https://github.com/nictru/nft-parquet",
+    "github": "nictru/nft-parquet",
+    "description": "Local Parquet assertions for nf-test using Carpet and Apache Parquet.",
+    "author": "Nico Trummer",
+    "keywords": ["parquet"],
+    "releases": [
+      {
+        "version": "0.1.0",
+        "url": "https://github.com/nictru/nft-parquet/releases/download/v0.1.0/nft-parquet-0.1.0.jar"
+      }
+    ]
+  }
+]

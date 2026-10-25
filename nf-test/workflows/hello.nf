@@ -1,16 +1,16 @@
-include { toParquet } from 'plugin/nf-parquet'
+nextflow.enable.dsl = 2
 
-import myrecords.*
+// Fixtures are generated locally by Gradle, not downloaded or written by a plugin.
+process COPY_PARQUET {
+    input:
+    path fixture
 
+    output:
+    path "copied/${fixture.name}", emit: parquet_file
 
-workflow MAIN {
-    main:
-    channel.of(1,2,3)
-            .map( {
-                new CustomRecord(it, "the $it record", it, it, it)
-            })
-            .toParquet("${workDir}/demo.parquet", [record: CustomRecord])
-
-    emit:
-    "${workDir}/demo.parquet"
+    script:
+    """
+    mkdir -p copied
+    cp '${fixture.name}' 'copied/${fixture.name}'
+    """
 }

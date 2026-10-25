@@ -1,0 +1,98 @@
+{
+    "portable schema and finite row": {
+        "content": [
+            {
+                "name": "DifferentialExpression",
+                "fields": [
+                    {
+                        "name": "gene",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "BINARY",
+                        "logicalType": {
+                            "type": "STRING"
+                        },
+                        "fields": []
+                    },
+                    {
+                        "name": "log2fc",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "DOUBLE",
+                        "logicalType": null,
+                        "fields": []
+                    },
+                    {
+                        "name": "pvalue",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "DOUBLE",
+                        "logicalType": null,
+                        "fields": []
+                    },
+                    {
+                        "name": "padj",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "DOUBLE",
+                        "logicalType": null,
+                        "fields": []
+                    },
+                    {
+                        "name": "group",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "BINARY",
+                        "logicalType": {
+                            "type": "STRING"
+                        },
+                        "fields": []
+                    },
+                    {
+                        "name": "contrast",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "BINARY",
+                        "logicalType": {
+                            "type": "STRING"
+                        },
+                        "fields": []
+                    },
+                    {
+                        "name": "stratum",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "BINARY",
+                        "logicalType": {
+                            "type": "STRING"
+                        },
+                        "fields": []
+                    },
+                    {
+                        "name": "significant",
+                        "repetition": "OPTIONAL",
+                        "nullable": true,
+                        "physicalType": "BOOLEAN",
+                        "logicalType": null,
+                        "fields": []
+                    }
+                ]
+            },
+            {
+                "gene": "GENE1",
+                "log2fc": 1.25,
+                "pvalue": 0.01,
+                "padj": 0.02,
+                "group": "treated",
+                "contrast": "treated-control",
+                "stratum": "all",
+                "significant": true
+            }
+        ],
+        "timestamp": "2026-10-25T10:40:19.202767008",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "23.10.0"
+        }
+    }
+}

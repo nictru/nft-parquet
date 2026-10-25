@@ -28,18 +28,22 @@ import java.nio.file.Path
 @CompileStatic
 class PathExtension {
 
-    static Object getParquet(Path self) throws Exception {
+    static ParquetWrapper getParquet(Path self) throws Exception {
         return parquet(self, [:])
     }
 
-    static Object parquet(Path self) throws Exception {
+    static ParquetWrapper parquet(Path self) throws Exception {
         return parquet(self, [:])
     }
 
-    static Object parquet(Path self, LinkedHashMap options) throws Exception {
-        def defaults = [:]
-        def arguments = defaults+options
-        return new ParquetWrapper(new File(self.toAbsolutePath().toString()), arguments)
+    static ParquetWrapper parquet(Path self, Map options) throws Exception {
+        if (self == null) {
+            throw new IllegalArgumentException('Parquet path must not be null')
+        }
+        if (!'file'.equalsIgnoreCase(self.toUri().getScheme())) {
+            throw new IllegalArgumentException('Parquet path must use the local file scheme')
+        }
+        return new ParquetWrapper(self.toFile(), options)
     }
 
 

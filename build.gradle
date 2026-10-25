@@ -8,6 +8,7 @@ plugins {
     // Apply the groovy Plugin to add support for Groovy.
     id 'groovy'
     id 'java-library'
+    id 'com.gradleup.shadow' version '8.3.6'
 }
 
 repositories {
@@ -16,11 +17,19 @@ repositories {
 
 dependencies{
     implementation 'com.jerolba:carpet-record:0.2.0'
+    implementation 'org.apache.parquet:parquet-hadoop:1.14.2'
+    implementation 'org.apache.parquet:parquet-column:1.14.2'
 
     compileOnlyApi platform('org.apache.groovy:groovy-bom:4.0.26')
     compileOnlyApi 'org.apache.groovy:groovy'
     testImplementation platform("org.spockframework:spock-bom:2.3-groovy-4.0")
     testImplementation "org.spockframework:spock-core"
+    testImplementation 'org.apache.groovy:groovy-json:4.0.26'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+configurations.runtimeClasspath {
+    exclude group: 'org.slf4j', module: 'slf4j-api'
 }
 
 java {
@@ -34,16 +43,44 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
-tasks.register('uberJar', Jar) {
-    group 'build'
-    archiveClassifier = ""
-
-    from sourceSets.main.output
-
-    dependsOn configurations.runtimeClasspath
-    from {
-        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
+def pluginVersion = project.version.toString()
+tasks.named('processResources') {
+    inputs.property 'version', pluginVersion
+    filesMatching('META-INF/nf-test-plugin') {
+        expand(version: pluginVersion)
     }
+}
 
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+tasks.named('jar') {
+    archiveClassifier = 'thin'
+}
+
+tasks.named('shadowJar') {
+    archiveClassifier = ''
+    mergeServiceFiles()
+    exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA', 'META-INF/INDEX.LIST'
+}
+
+tasks.register('pluginJar') {
+    group = 'build'
+    description = 'Build the dependency-bundled nf-test plugin.'
+    dependsOn tasks.named('shadowJar')
+}
+
+tasks.register('uberJar') {
+    group = 'build'
+    description = 'Compatibility alias for pluginJar.'
+    dependsOn tasks.named('pluginJar')
+}
+
+tasks.register('generateIntegrationFixtures', JavaExec) {
+    group = 'verification'
+    description = 'Generate deterministic local Parquet fixtures for nf-test.'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.incsteps.nftest.parquet.Fixtures'
+    args layout.buildDirectory.dir('integration-fixtures').get().asFile.absolutePath
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }

@@ -1,0 +1,116 @@
+import com.incsteps.nftest.parquet.Fixtures.Projection
+import java.nio.file.Paths
+
+nextflow_process {
+    name "Local Parquet inspection"
+    script "../workflows/hello.nf"
+    process "COPY_PARQUET"
+
+    test("Inspect differential-expression output with literal local paths") {
+        when {
+            process {
+                """
+                input[0] = file(params.fixture_dir + '/DE results:case.parquet', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def output = process.out.parquet_file[0]
+            def localPath = Paths.get(output.toString())
+            assert localPath.fileName.toString() == 'DE results:case.parquet'
+
+            // Global overloads and all compatibility extension entry points.
+            def table = parquet(output.toString())
+            assert parquet(localPath).rows == table.rows
+            assert path(output).parquet.rows == table.rows
+            assert path(output).parquet().rowCount == 3
+            assert path(output).parquet([:]).rowCount() == 3
+            try {
+                path(output).parquet([unsupported: true])
+                assert false: 'Nonempty option maps must not be silently ignored'
+            } catch (IllegalArgumentException expected) {
+                assert expected.message.contains('does not accept options')
+            }
+            assert table.rowCount == 3
+            assert table.rowCount() == 3
+            assert table.columnNames == ['gene', 'log2fc', 'pvalue', 'padj', 'group', 'contrast', 'stratum', 'significant']
+
+            def fields = table.schema.fields
+            assert fields*.name == table.columnNames
+            assert fields.every { it.nullable && it.repetition == 'OPTIONAL' }
+            assert fields.find { it.name == 'gene' }.physicalType == 'BINARY'
+            assert fields.find { it.name == 'gene' }.logicalType == [type: 'STRING']
+            assert fields.find { it.name == 'log2fc' }.physicalType == 'DOUBLE'
+            assert fields.find { it.name == 'significant' }.physicalType == 'BOOLEAN'
+            assert table.rowGroupCount == 1
+            assert table.rowGroups*.rowCount.sum() == table.rowCount
+            assert table.rowGroups[0].columns*.path == table.columnNames.collect { [it] }
+            assert table.compressionCodecs == table.rowGroups.collectMany { it.columns*.codec }.unique().sort()
+            assert !table.compressionCodecs.empty
+
+            def rows = table.rows
+            assert rows*.gene == ['GENE1', 'GENE2', 'GENE3']
+            assert rows.every { it instanceof Map }
+            assert rows[0] == [gene: 'GENE1', log2fc: 1.25d, pvalue: 0.01d, padj: 0.02d,
+                               group: 'treated', contrast: 'treated-control', stratum: 'all', significant: true]
+            assert rows[0].log2fc instanceof Double
+            assert rows[0].significant instanceof Boolean
+            assert rows[1].log2fc == null
+            assert rows[1].pvalue.isNaN()
+            assert rows[1].padj == Double.POSITIVE_INFINITY
+            assert rows[1].group == 'control'
+            assert rows[1].stratum == null
+            assert rows[1].significant == false
+            assert rows[2].log2fc == Double.NEGATIVE_INFINITY
+            assert rows[2].pvalue == 0.0d
+            assert rows[2].padj == null
+            assert rows[2].stratum == 'α β'
+            assert rows[2].significant == null
+
+            // A realistic DE assertion: exclude null/nonfinite values before thresholds.
+            def hits = rows.findAll {
+                it.log2fc != null && Double.isFinite(it.log2fc) &&
+                it.padj != null && Double.isFinite(it.padj) &&
+                Math.abs(it.log2fc) >= 1.0d && it.padj < 0.05d && it.significant == true
+            }
+            assert hits*.gene == ['GENE1']
+
+            def projected = table.read(Projection)
+            assert projected.every { it instanceof Projection }
+            assert projected*.gene() == ['GENE1', 'GENE2', 'GENE3']
+            assert projected[0].log2fc() == 1.25d
+            assert projected[1].log2fc() == null
+            assert projected[2].log2fc() == Double.NEGATIVE_INFINITY
+
+            // Snapshot semantic data only: no paths, binary hashes, sizes or NaN/Infinity JSON.
+            assert snapshot(table.schema, rows[0]).match('portable schema and finite row')
+        }
+    }
+
+    test("Inspect empty-file metadata without inferring schema from rows") {
+        when {
+            process {
+                """
+                input[0] = file(params.fixture_dir + '/empty.parquet', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def table = parquet(process.out.parquet_file[0].toString())
+            assert table.rowCount == 0
+            assert table.rowCount() == 0
+            assert table.rows == []
+            assert table.read(Projection) == []
+            assert table.columnNames == ['gene', 'log2fc', 'pvalue', 'padj', 'group', 'contrast', 'stratum', 'significant']
+            assert table.schema.fields*.name == table.columnNames
+            assert table.schema.fields.find { it.name == 'significant' }.physicalType == 'BOOLEAN'
+            assert table.rowGroupCount == 0
+            assert table.rowGroups == []
+            assert table.compressionCodecs == []
+        }
+    }
+}

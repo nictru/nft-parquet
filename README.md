@@ -2,7 +2,7 @@
 
 Local Parquet assertions for [nf-test](https://www.nf-test.com/), implemented directly with Carpet and Apache Parquet (not a delegation to `nf-parquet`).
 
-Install **0.1.0** from the GitHub-hosted custom registry below, or build the plugin locally.
+Install the [latest release](https://github.com/nictru/nft-parquet/releases/latest) from the GitHub-hosted custom registry below, or build the plugin locally.
 
 ## Install
 
@@ -10,63 +10,62 @@ Requires Java 17 or newer, nf-test 0.9.5, and Nextflow. CI targets Java 17 and 2
 
 ### Install from GitHub (recommended)
 
-No official nf-test registry registration, cloning, or local build is needed. Add the GitHub-hosted registry to your pipeline's `nf-test.config`:
+No official nf-test registry registration, cloning, or local build is needed. Find the version on the [latest release page](https://github.com/nictru/nft-parquet/releases/latest), then replace `<version>` below with that version number (without the leading `v`) in your pipeline's `nf-test.config`:
 
 ```groovy
 config {
     plugins {
         repository 'https://raw.githubusercontent.com/nictru/nft-parquet/main/plugins.json'
-        load 'nictru-nft-parquet@0.1.0'
+        load 'nictru-nft-parquet@<version>'
     }
 }
 ```
 
-Then run `nf-test test` as usual. nf-test downloads the bundled plugin JAR directly from this fork's GitHub release and caches it locally. Keep the version pinned to make pipeline tests reproducible.
+Then run `nf-test test` as usual. nf-test downloads the bundled plugin JAR directly from this fork's GitHub release and caches it locally. nf-test requires an explicit version; `@latest` is not supported. Keep the resolved version pinned to make pipeline tests reproducible.
 
-The unique **registry ID** `nictru-nft-parquet` is intentional. nf-test 0.9.5 searches the official registry first; the original `nft-parquet` ID resolves there before a custom repository is considered. Do not co-load the original plugin with this fork: they share the extension/module identity. `loadFromFile` does **not** download URLs. The registry resolves the version to:
-
-<https://github.com/nictru/nft-parquet/releases/download/v0.1.0/nft-parquet-0.1.0.jar>
+The unique **registry ID** `nictru-nft-parquet` is intentional. nf-test 0.9.5 searches the official registry first; the original `nft-parquet` ID resolves there before a custom repository is considered. Do not co-load the original plugin with this fork: they share the extension/module identity. `loadFromFile` does **not** download URLs. The registry resolves the pinned version to its GitHub release asset.
 
 nf-test caches registry downloads under the current directory's `.nf-test/plugins`. Publish a new version rather than replacing an existing release asset. For an immutable registry index, replace `main` in the registry URL with the release tag or a commit containing that version's entry.
 
 ### Download the GitHub release manually
 
-If you prefer not to configure a custom registry, download and verify the JAR and checksum from the [v0.1.0 release](https://github.com/nictru/nft-parquet/releases/tag/v0.1.0):
+If you prefer not to configure a custom registry, download and verify the JAR and checksum from the [latest release](https://github.com/nictru/nft-parquet/releases/latest). With the [GitHub CLI](https://cli.github.com/) installed, these commands resolve the latest release automatically:
 
 ```bash
+tag=$(gh release view --repo nictru/nft-parquet --json tagName --jq .tagName)
+version=${tag#v}
 mkdir -p .nf-test-plugins
-cd .nf-test-plugins
-curl -fLO https://github.com/nictru/nft-parquet/releases/download/v0.1.0/nft-parquet-0.1.0.jar
-curl -fLO https://github.com/nictru/nft-parquet/releases/download/v0.1.0/nft-parquet-0.1.0.jar.sha256
-sha256sum -c nft-parquet-0.1.0.jar.sha256
-cd ..
+gh release download "$tag" --repo nictru/nft-parquet --dir .nf-test-plugins \
+    --pattern "nft-parquet-$version.jar" --pattern "nft-parquet-$version.jar.sha256"
+(cd .nf-test-plugins && sha256sum -c "nft-parquet-$version.jar.sha256")
 ```
 
-Load the downloaded file in `nf-test.config` (paths are relative to the directory where nf-test runs):
+Load the downloaded file in `nf-test.config`, replacing `<version>` with the resolved version (paths are relative to the directory where nf-test runs):
 
 ```groovy
 config {
     plugins {
-        loadFromFile '.nf-test-plugins/nft-parquet-0.1.0.jar'
+        loadFromFile '.nf-test-plugins/nft-parquet-<version>.jar'
     }
 }
 ```
 
-Alternatively, run `nf-test test --plugins .nf-test-plugins/nft-parquet-0.1.0.jar`. Use either the custom registry or the local JAR, not both. Add `.nf-test-plugins/` to your pipeline repository's `.gitignore`.
+Alternatively, in the same shell used for the download, run `nf-test test --plugins ".nf-test-plugins/nft-parquet-$version.jar"`. Use either the custom registry or the local JAR, not both. Add `.nf-test-plugins/` to your pipeline repository's `.gitignore`.
 
 ### Build locally
 
 ```bash
 git clone https://github.com/nictru/nft-parquet.git
 cd nft-parquet
-git checkout v0.1.0
+tag=$(gh release view --repo nictru/nft-parquet --json tagName --jq .tagName)
+git checkout "$tag"
 ./gradlew check pluginJar
 python3 scripts/validate-distribution.py
 ```
 
-Use Java 17 or 21 to run Gradle. Load the resulting JAR with `loadFromFile '/absolute/path/to/nft-parquet/build/libs/nft-parquet-0.1.0.jar'`.
+Use Java 17 or 21 to run Gradle. The commands above use the GitHub CLI to select the latest release; alternatively, select a tag from the [latest release page](https://github.com/nictru/nft-parquet/releases/latest). Load the resulting JAR with `loadFromFile '/absolute/path/to/nft-parquet/build/libs/nft-parquet-<version>.jar'`, substituting the built version.
 
-`pluginJar` builds the dependency-bundled `build/libs/nft-parquet-0.1.0.jar`. The `-thin.jar` from the ordinary `jar` task is not a standalone distribution. `META-INF/nf-test-plugin` keeps module name `nft-parquet`; its version is generated from `gradle.properties`.
+`pluginJar` builds the dependency-bundled `build/libs/nft-parquet-<version>.jar`. The `-thin.jar` from the ordinary `jar` task is not a standalone distribution. `META-INF/nf-test-plugin` keeps module name `nft-parquet`; its version is generated from `gradle.properties`.
 
 ## Assertions
 
@@ -154,7 +153,8 @@ A maintainer explicitly publishes a version-tagged GitHub release. The release w
 Only **after** the index and release asset are public, run:
 
 ```bash
-bash scripts/smoke-registry.sh 0.1.0
+tag=$(gh release view --repo nictru/nft-parquet --json tagName --jq .tagName)
+bash scripts/smoke-registry.sh "${tag#v}"
 ```
 
 This resolves the actual registry ID in a temporary project with a fresh plugin cache; it does not substitute a local JAR. It is intentionally not a pre-release CI step.
